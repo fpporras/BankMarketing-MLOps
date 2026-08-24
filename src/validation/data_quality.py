@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 
-# Project paths
+# Rutas del proyecto y del archivo de datos
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RAW_DATA_FILE = PROJECT_ROOT / "data" / "raw" / "bank_marketing.csv"
 
