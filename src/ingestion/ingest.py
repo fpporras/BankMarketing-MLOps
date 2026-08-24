@@ -11,37 +11,36 @@ RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 
 def ingest_bank_marketing():
     """
-    Download the Bank Marketing dataset from the UCI Machine Learning Repository
-    and save the raw dataset locally.
+    Descarga el dataset de Bank Marketing desde UCI Machine Learning Repository y guarda el dataset raw localmente.
     """
 
-    print("Starting Bank Marketing dataset ingestion...")
+    print("Iniciando la ingesta del conjunto de datos de Bank Marketing...")
 
-    # Create raw data directory if it does not exist
+    # Crea el directorio de datos raw si no existe
     RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Fetch dataset from UCI
+    # Trae el dataset desde UCI
     bank_marketing = fetch_ucirepo(id=222)
 
-    # Separate features and target
+    # Separa las features y target (X y Y)
     X = bank_marketing.data.features
     y = bank_marketing.data.targets
 
-    # Combine features and target into one DataFrame
+    # Combina las features (X) y target (Y) en un mismo DataFrame
     df_raw = pd.concat([X, y], axis=1)
 
-    # Save raw dataset
+    # Guarda el dataset raw
     output_file = RAW_DATA_DIR / "bank_marketing.csv"
     df_raw.to_csv(output_file, index=False)
 
-    print(f"Dataset saved to: {output_file}")
-    print(f"Rows: {df_raw.shape[0]}")
-    print(f"Columns: {df_raw.shape[1]}")
+    print(f"Dataset guardado en: {output_file}")
+    print(f"Filas: {df_raw.shape[0]}")
+    print(f"Columnas: {df_raw.shape[1]}")
 
-    print("\nColumns:")
+    print("\nColumnas:")
     print(df_raw.columns.tolist())
 
-    print("\nTarget distribution:")
+    print("\nDistribución del target:")
     print(df_raw["y"].value_counts())
 
     return df_raw
