@@ -76,7 +76,7 @@ def run_data_quality_diagnosis(df_raw):
     print("\n11. Resumen categórico")
 
     categorical_columns = df_raw.select_dtypes(
-        include=["str", "object"]
+        include=["object"]
     ).columns
 
     print(df_raw[categorical_columns].describe().T)

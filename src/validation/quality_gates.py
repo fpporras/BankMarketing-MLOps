@@ -564,7 +564,6 @@ if __name__ == "__main__":
     quality_passed = run_quality_gates(
         df_raw
     )
-
     if not quality_passed:
 
         raise SystemExit(
