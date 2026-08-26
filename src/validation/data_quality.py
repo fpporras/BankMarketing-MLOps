@@ -100,9 +100,57 @@ def run_data_quality_diagnosis(df_raw):
     else:
         print("No se encontraron valores 'unknown'.")
 
+def analyze_missing_values(df_raw):
+    """Analiza los valores faltantes del dataset."""
+
+    print("\n" + "=" * 60)
+    print("ANÁLISIS DETALLADO DE VALORES FALTANTES")
+    print("=" * 60)
+
+    missing = df_raw.isna().sum()
+    missing = missing[missing > 0]
+
+    if missing.empty:
+        print("\nNo se encontraron valores faltantes.")
+        return
+
+    total_rows = len(df_raw)
+
+    for column, count in missing.items():
+
+        percentage = count / total_rows * 100
+
+        print(f"\nVariable: {column}")
+        print(f"Valores faltantes: {count}")
+        print(f"Porcentaje: {percentage:.2f}%")
+
+        print("Distribución del target entre registros faltantes:")
+
+        target_distribution = (
+            df_raw.loc[df_raw[column].isna(), "y"]
+            .value_counts(normalize=True)
+            .mul(100)
+            .round(2)
+        )
+
+        print(target_distribution)
+
+        print("Distribución del target entre registros NO faltantes:")
+
+        target_distribution_not_missing = (
+            df_raw.loc[df_raw[column].notna(), "y"]
+            .value_counts(normalize=True)
+            .mul(100)
+            .round(2)
+        )
+
+        print(target_distribution_not_missing)
 
 if __name__ == "__main__":
 
     df_raw = load_raw_data()
 
     run_data_quality_diagnosis(df_raw)
+    
+    analyze_missing_values(df_raw)
+    
