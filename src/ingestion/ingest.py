@@ -45,6 +45,22 @@ def ingest_bank_marketing():
 
     return df_raw
 
+def load_raw_data():
+    """
+    Carga el dataset raw guardado localmente.
+    """
+
+    input_file = RAW_DATA_DIR / "bank_marketing.csv"
+
+    if not input_file.exists():
+        raise FileNotFoundError(
+            f"No se encontró el dataset en: {input_file}"
+        )
+
+    df_raw = pd.read_csv(input_file)
+
+    return df_raw
+
 
 if __name__ == "__main__":
     ingest_bank_marketing()
