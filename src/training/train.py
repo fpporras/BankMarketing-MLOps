@@ -364,13 +364,16 @@ def main():
         "random_forest": {
 
             "model__n_estimators": [
-                100,
-                200
+                200,
+                300,
+                400
             ],
 
             "model__max_depth": [
-                8,
-                10
+                10,
+                15,
+                20,
+                None
             ]
 
         }
@@ -922,6 +925,9 @@ def print_metrics(
 # ============================================================
 # FUNCIÓN MLFLOW
 # ============================================================
+# Se centraliza el registro de experimentos de Machine Learning.
+# Ademas se guarda hiperparámetros, métricas y modelos entrenados en MLflow.
+
 
 def log_run(
     run_name: str,
