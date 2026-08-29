@@ -31,7 +31,7 @@ def build_features(df):
     )
 
     # Tratamiento de pdays
-    df["pdays"] = df["pdays"].replace(-1, 0)
+    # df["pdays"] = df["pdays"].replace(-1, 0)
 
     # Transformaciones logarítmicas
     df["campaign_log"] = np.log1p(
