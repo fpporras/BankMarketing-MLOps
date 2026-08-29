@@ -34,11 +34,11 @@ def build_features(df):
     # df["pdays"] = df["pdays"].replace(-1, 0)
 
     # Transformaciones logarítmicas
-    df["campaign_log"] = np.log1p(
+    df["campaign_log"] = np.log1p( #Eso puede generar variables altamente relacionadas
         df["campaign"]
     )
 
-    df["previous_log"] = np.log1p(
+    df["previous_log"] = np.log1p( #Eso puede generar variables altamente relacionadas
         df["previous"]
     )
 

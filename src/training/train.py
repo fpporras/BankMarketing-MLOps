@@ -85,7 +85,7 @@ def main():
 
 
     # ========================================================
-    # 4. SEPARAR X E y
+    # 4. SEPARAR X y Y
     # ========================================================
 
     X = df_features.drop(
@@ -235,30 +235,23 @@ def main():
     models = {
 
         "logistic_regression": LogisticRegression(
-
             max_iter=1000,
-
-            random_state=RANDOM_STATE
-
+            random_state=RANDOM_STATE,
+            class_weight="balanced"
         ),
-
-
+        
         "decision_tree": DecisionTreeClassifier(
-
-            random_state=RANDOM_STATE
-
+            random_state=RANDOM_STATE,
+            class_weight="balanced"
         ),
 
 
         "random_forest": RandomForestClassifier(
-
             n_estimators=100,
-
             random_state=RANDOM_STATE,
-
-            n_jobs=1
-
-        )
+            n_jobs=1,
+            class_weight="balanced"
+        ),
 
     }
 
@@ -285,12 +278,12 @@ def main():
                     preprocessor
                 ),
 
-                (
-                    "smote",
-                    SMOTE(
-                        random_state=RANDOM_STATE
-                    )
-                ),
+                #(   Incompatibilidad con One-Hot Encoding ## 
+                    #"smote",
+                    #SMOTE(
+                        #random_state=RANDOM_STATE
+                    #)
+                #),
 
                 (
                     "model",
