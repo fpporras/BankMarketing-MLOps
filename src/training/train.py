@@ -19,7 +19,9 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
-from imblearn.over_sampling import SMOTE
+# Se elimina esta línea ya que no es necesaria:
+# from imblearn.over_sampling import SMOTE
+
 from imblearn.pipeline import Pipeline
 
 import mlflow
