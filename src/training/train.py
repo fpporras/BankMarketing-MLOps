@@ -683,10 +683,13 @@ def main():
     )
 
 
+    mlflow.set_tracking_uri("http://127.0.0.1:5000") #faltaba la direccion del ML Flow 
+    
     mlflow.set_experiment(
         "bank-marketing-classification"
     )
-
+    
+    
 
     # ========================================================
     # REGISTRAR BASELINE
@@ -1012,7 +1015,7 @@ def log_run(
 
         trusted_types = [
             "imblearn.pipeline.Pipeline",
-            "imblearn.over_sampling._smote.base.SMOTE"
+            #"imblearn.over_sampling._smote.base.SMOTE"
         ]
 
         if register_as:
