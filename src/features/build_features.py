@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def build_features(df):
     """
@@ -47,5 +50,11 @@ def build_features(df):
         df = df.drop(
             columns=["duration"]
         )
+    # Guardar dataframe en data/processed/
+    processed_dir = PROJECT_ROOT / "data" / "processed"
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    processed_path = processed_dir / "df_features.csv"
 
+    df.to_csv(processed_path, index=False)
+    
     return df
