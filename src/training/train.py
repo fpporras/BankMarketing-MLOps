@@ -143,17 +143,19 @@ def log_run(
             display.plot()
             plt.title(f"Matriz de Confusión - {run_name}")
             plt.tight_layout()
+            
+            # Guardar en local ANTES de cerrar la figura
+            figures_dir = PROJECT_ROOT / "reports" / "figures"
+            figures_dir.mkdir(parents=True, exist_ok=True)
+            plt.savefig(figures_dir / f"confusion_matrix_{run_name}.png")
 
             with tempfile.TemporaryDirectory() as temp_dir:
                 cm_path = Path(temp_dir) / "confusion_matrix.png"
                 plt.savefig(cm_path)
                 plt.close()
                 mlflow.log_artifact(str(cm_path), artifact_path="evaluation")
-                # Copia persistente local para la estructura del proyecto
-                figures_dir = PROJECT_ROOT / "reports" / "figures"
-                figures_dir.mkdir(parents=True, exist_ok=True)
-                plt.savefig(figures_dir / f"confusion_matrix_{run_name}.png")
-
+            plt.close()       
+            
         config = {
             "run_name": run_name,
             "algorithm": algorithm,
@@ -207,8 +209,7 @@ def main():
 
     # Convertir el target 'no'/'yes' a 0/1
     y = df_features[TARGET_COLUMN].map({"no": 0, "yes": 1}).astype(int)
-    FEATURE_SET = list(X.columns)
-
+    
     # 5. Train / Test Split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
