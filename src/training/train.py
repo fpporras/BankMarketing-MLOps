@@ -30,6 +30,7 @@ from src.ingestion.ingest import load_raw_data
 from src.validation.quality_gates import run_quality_gates
 from src.features.build_features import build_features
 from src.preprocessing.preprocess import build_preprocessor
+from src.evaluation.promote_model import promote_registered_model
 
 
 # ============================================================
@@ -683,6 +684,11 @@ def main():
         cv_f1=best_grid.best_score_,
         feature_set=feature_set,
         register_model=True
+    )
+    
+    promote_registered_model(
+    model_name="bank-marketing-classifier", 
+    metrics=best_metrics
     )
 
     # --------------------------------------------------------

@@ -50,11 +50,5 @@ def build_features(df):
         df = df.drop(
             columns=["duration"]
         )
-    # Guardar dataframe en data/processed/
-    processed_dir = PROJECT_ROOT / "data" / "processed"
-    processed_dir.mkdir(parents=True, exist_ok=True)
-    processed_path = processed_dir / "df_features.csv"
-
-    df.to_csv(processed_path, index=False)
     
     return df
