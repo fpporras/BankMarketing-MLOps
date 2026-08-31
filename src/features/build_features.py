@@ -50,5 +50,5 @@ def build_features(df):
         df = df.drop(
             columns=["duration"]
         )
-    
+           
     return df

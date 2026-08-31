@@ -28,7 +28,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 from src.ingestion.ingest import load_raw_data
 from src.validation.quality_gates import run_quality_gates
-from src.features.build_features import build_features
+from src.features.prepare_data import prepare_processed_data
 from src.preprocessing.preprocess import build_preprocessor
 from src.evaluation.promote_model import promote_registered_model
 
@@ -393,9 +393,11 @@ def main():
     # 3. Features
     # --------------------------------------------------------
 
-    df_features = build_features(
-        df_raw
-    )
+    df_features = prepare_processed_data()
+    
+    # df_features = build_features(
+    #    df_raw
+    # )
 
     # --------------------------------------------------------
     # 4. X / y
