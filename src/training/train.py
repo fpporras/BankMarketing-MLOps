@@ -1,13 +1,9 @@
-# ============================================================
-# TRAINING PIPELINE - BANK MARKETING MLOPS
-# ============================================================
-
 from pathlib import Path
 import json
 import tempfile
 import warnings
-import joblib
 
+import joblib
 import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
@@ -26,288 +22,691 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import (
-    GridSearchCV,
-    train_test_split,
-)
+from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeClassifier
-
-# ============================================================
-# IMPORTS DEL PROYECTO (MODULARES)
-# ============================================================
 
 from src.ingestion.ingest import load_raw_data
 from src.validation.quality_gates import run_quality_gates
 from src.features.build_features import build_features
 from src.preprocessing.preprocess import build_preprocessor
 
+
 # ============================================================
-# CONFIGURACIÓN GENERAL
+# CONFIGURATION
 # ============================================================
 
 RANDOM_STATE = 42
 DATA_VERSION = "bank-marketing-v1"
+
 EXPERIMENT_NAME = "bank-marketing-classification"
+REGISTERED_MODEL_NAME = "bank-marketing-classifier"
+
 TARGET_COLUMN = "y"
+
 TEST_SIZE = 0.20
 CV_FOLDS = 5
 
 MLFLOW_TRACKING_URI = "http://127.0.0.1:5000"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 MODELS_DIR = PROJECT_ROOT / "models"
-MLARTIFACTS_DIR = PROJECT_ROOT / "mlartifacts"
 REPORTS_DIR = PROJECT_ROOT / "reports" / "figures"
 
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
-MLARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+
 # ============================================================
-# EVALUACIÓN DEL MODELO
+# EVALUATION
 # ============================================================
 
-def evaluate_model(model, X_test: pd.DataFrame, y_test: pd.Series) -> dict:
+def evaluate_model(model, X_test, y_test):
+
     y_pred = model.predict(X_test)
 
     if hasattr(model, "predict_proba"):
-        y_prob = model.predict_proba(X_test)[:, 1]
-        roc_auc = roc_auc_score(y_test, y_prob)
-    else:
-        roc_auc = np.nan
 
-    cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
+        y_prob = model.predict_proba(X_test)[:, 1]
+
+        roc_auc = roc_auc_score(
+            y_test,
+            y_prob
+        )
+
+    else:
+
+        roc_auc = 0.0
+
+    cm = confusion_matrix(
+        y_test,
+        y_pred,
+        labels=[0, 1]
+    )
 
     return {
-        "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred, zero_division=0)),
-        "recall": float(recall_score(y_test, y_pred, zero_division=0)),
-        "f1": float(f1_score(y_test, y_pred, zero_division=0)),
-        "roc_auc": float(roc_auc) if not np.isnan(roc_auc) else 0.0,
-        "confusion_matrix": cm.tolist(),
+        "accuracy": float(
+            accuracy_score(y_test, y_pred)
+        ),
+
+        "precision": float(
+            precision_score(
+                y_test,
+                y_pred,
+                zero_division=0
+            )
+        ),
+
+        "recall": float(
+            recall_score(
+                y_test,
+                y_pred,
+                zero_division=0
+            )
+        ),
+
+        "f1": float(
+            f1_score(
+                y_test,
+                y_pred,
+                zero_division=0
+            )
+        ),
+
+        "roc_auc": float(roc_auc),
+
+        "true_negatives": int(cm[0][0]),
+        "false_positives": int(cm[0][1]),
+        "false_negatives": int(cm[1][0]),
+        "true_positives": int(cm[1][1]),
     }
 
-def print_metrics(title: str, metrics: dict) -> None:
-    print("\n" + "=" * 45 + f"\n{title}\n" + "=" * 45)
-    print(f"Accuracy : {metrics['accuracy']:.4f}")
-    print(f"Precision: {metrics['precision']:.4f}")
-    print(f"Recall   : {metrics['recall']:.4f}")
-    print(f"F1 Score : {metrics['f1']:.4f}")
-    print(f"ROC-AUC  : {metrics['roc_auc']:.4f}")
-    cm = metrics["confusion_matrix"]
-    print(f"\nMatriz de confusión:\nVN={cm[0][0]} | FP={cm[0][1]}\nFN={cm[1][0]} | VP={cm[1][1]}")
+
+def print_metrics(name, metrics):
+
+    print("\n" + "=" * 60)
+    print(name)
+    print("=" * 60)
+
+    print(
+        f"Accuracy : {metrics['accuracy']:.4f}"
+    )
+
+    print(
+        f"Precision: {metrics['precision']:.4f}"
+    )
+
+    print(
+        f"Recall   : {metrics['recall']:.4f}"
+    )
+
+    print(
+        f"F1       : {metrics['f1']:.4f}"
+    )
+
+    print(
+        f"ROC-AUC  : {metrics['roc_auc']:.4f}"
+    )
+
+    print(
+        f"TN: {metrics['true_negatives']}"
+    )
+
+    print(
+        f"FP: {metrics['false_positives']}"
+    )
+
+    print(
+        f"FN: {metrics['false_negatives']}"
+    )
+
+    print(
+        f"TP: {metrics['true_positives']}"
+    )
+
 
 # ============================================================
-# REGISTRAR EXPERIMENTO EN MLFLOW
+# MLFLOW
 # ============================================================
 
-def log_run(
-    run_name: str,
+def log_model_run(
+    run_name,
     model,
-    algorithm: str,
-    params: dict,
-    metrics: dict,
-    feature_set: list,
-    register_as: str = None,
-) -> None:
+    algorithm,
+    params,
+    metrics,
+    feature_set,
+    cv_f1=None,
+    register_model=False,
+):
+
     with mlflow.start_run(run_name=run_name):
-        tracking_params = {
-            "algorithm": algorithm,
-            "random_seed": RANDOM_STATE,
-            "data_version": DATA_VERSION,
-            "feature_count": len(feature_set),
-            "feature_set": ",".join(feature_set),
-        }
 
-        all_params = {**tracking_params, **params}
-        safe_params = {str(k): str(v) for k, v in all_params.items()}
-        mlflow.log_params(safe_params)
+        # ----------------------------------------------------
+        # Parameters
+        # ----------------------------------------------------
 
-        numeric_metrics = {
-            k: float(v) for k, v in metrics.items() 
-            if k != "confusion_matrix" and isinstance(v, (int, float, np.integer, np.floating))
-        }
-        if numeric_metrics:
-            mlflow.log_metrics(numeric_metrics)
+        mlflow.log_param(
+            "algorithm",
+            algorithm
+        )
 
-        if "confusion_matrix" in metrics:
-            cm = np.array(metrics["confusion_matrix"])
-            mlflow.log_metric("true_negatives", int(cm[0][0]))
-            mlflow.log_metric("false_positives", int(cm[0][1]))
-            mlflow.log_metric("false_negatives", int(cm[1][0]))
-            mlflow.log_metric("true_positives", int(cm[1][1]))
+        mlflow.log_param(
+            "random_seed",
+            RANDOM_STATE
+        )
 
-            display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["no", "yes"])
-            display.plot()
-            plt.title(f"Matriz de Confusión - {run_name}")
-            plt.tight_layout()
+        mlflow.log_param(
+            "data_version",
+            DATA_VERSION
+        )
 
-            # Guardar en local ANTES de cerrar la figura
-            plt.savefig(REPORTS_DIR / f"confusion_matrix_{run_name}.png")
+        mlflow.log_param(
+            "feature_count",
+            len(feature_set)
+        )
 
-            with tempfile.TemporaryDirectory() as temp_dir:
-                cm_path = Path(temp_dir) / "confusion_matrix.png"
-                plt.savefig(cm_path)
-                mlflow.log_artifact(str(cm_path), artifact_path="evaluation")
-            
-            plt.close()
+        mlflow.log_param(
+            "feature_set",
+            ",".join(feature_set)
+        )
+
+        for key, value in params.items():
+
+            mlflow.log_param(
+                key,
+                str(value)
+            )
+
+        # ----------------------------------------------------
+        # Metrics
+        # ----------------------------------------------------
+
+        if cv_f1 is not None:
+
+            mlflow.log_metric(
+                "cv_f1",
+                float(cv_f1)
+            )
+
+        for key, value in metrics.items():
+
+            mlflow.log_metric(
+                key,
+                float(value)
+            )
+
+        # ----------------------------------------------------
+        # Confusion Matrix
+        # ----------------------------------------------------
+
+        cm = np.array([
+            [
+                metrics["true_negatives"],
+                metrics["false_positives"]
+            ],
+            [
+                metrics["false_negatives"],
+                metrics["true_positives"]
+            ]
+        ])
+
+        display = ConfusionMatrixDisplay(
+            confusion_matrix=cm,
+            display_labels=["no", "yes"]
+        )
+
+        display.plot()
+
+        plt.title(
+            f"Matriz de Confusión - {run_name}"
+        )
+
+        plt.tight_layout()
+
+        figure_path = (
+            REPORTS_DIR /
+            f"confusion_matrix_{run_name}.png"
+        )
+
+        plt.savefig(
+            figure_path
+        )
+
+        plt.close()
+
+        mlflow.log_artifact(
+            str(figure_path),
+            artifact_path="evaluation"
+        )
+
+        # ----------------------------------------------------
+        # Configuration artifact
+        # ----------------------------------------------------
 
         config = {
             "run_name": run_name,
             "algorithm": algorithm,
-            "random_seed": RANDOM_STATE,
+            "random_state": RANDOM_STATE,
             "data_version": DATA_VERSION,
             "feature_set": feature_set,
             "feature_count": len(feature_set),
-            "model_params": params,
+            "parameters": params,
+            "metrics": metrics,
         }
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            config_path = Path(temp_dir) / "config.json"
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4, ensure_ascii=False, default=str)
-            mlflow.log_artifact(str(config_path), artifact_path="configuration")
 
-        if register_as:
-            mlflow.sklearn.log_model(sk_model=model, name="model", registered_model_name=register_as)
+            config_path = (
+                Path(temp_dir) /
+                "config.json"
+            )
+
+            with open(
+                config_path,
+                "w",
+                encoding="utf-8"
+            ) as file:
+
+                json.dump(
+                    config,
+                    file,
+                    indent=4,
+                    ensure_ascii=False
+                )
+
+            mlflow.log_artifact(
+                str(config_path),
+                artifact_path="configuration"
+            )
+
+        # ----------------------------------------------------
+        # Model
+        # ----------------------------------------------------
+
+        if register_model:
+
+            mlflow.sklearn.log_model(
+                sk_model=model,
+                name="model",
+                registered_model_name=REGISTERED_MODEL_NAME
+            )
+
         else:
-            mlflow.sklearn.log_model(sk_model=model, name="model")
+
+            mlflow.sklearn.log_model(
+                sk_model=model,
+                name="model"
+            )
+
 
 # ============================================================
-# FUNCIÓN PRINCIPAL
+# MAIN
 # ============================================================
 
 def main():
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    mlflow.set_experiment(EXPERIMENT_NAME)
 
-    print("\n" + "=" * 70 + "\nINICIANDO PIPELINE DE ENTRENAMIENTO\n" + "=" * 70)
-
-    # 1. Carga de datos
-    df_raw = load_raw_data()
-    print(f"Datos cargados. Dimensiones: {df_raw.shape}")
-
-    # 2. Quality Gates
-    if not run_quality_gates(df_raw):
-        raise SystemExit("Quality Gates fallidas. Pipeline bloqueado.")
-    print("Quality Gates superados.")
-
-    # 3. Feature Engineering
-    df_features = build_features(df_raw)
-    print(f"Feature Engineering completado. Dimensiones: {df_features.shape}")
-
-    # 4. Separación X / y
-    if TARGET_COLUMN not in df_features.columns:
-        raise ValueError(f"La columna target '{TARGET_COLUMN}' no existe.")
-
-    X = df_features.drop(columns=[TARGET_COLUMN])
-    FEATURE_SET = list(X.columns)
-
-    y = df_features[TARGET_COLUMN].map({"no": 0, "yes": 1}).astype(int)
-
-    # 5. Train / Test Split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
+    mlflow.set_tracking_uri(
+        MLFLOW_TRACKING_URI
     )
 
-    # 6. Baseline
-    baseline = Pipeline([
-        ("preprocessor", build_preprocessor(X_train)),
-        ("model", DummyClassifier(strategy="most_frequent"))
-    ])
-    baseline.fit(X_train, y_train)
-    baseline_metrics = evaluate_model(baseline, X_test, y_test)
+    mlflow.set_experiment(
+        EXPERIMENT_NAME
+    )
 
-    # 7. Modelos Candidatos
+    print(
+        "\n" +
+        "=" * 70 +
+        "\nTRAINING PIPELINE\n" +
+        "=" * 70
+    )
+
+    # --------------------------------------------------------
+    # 1. Load
+    # --------------------------------------------------------
+
+    df_raw = load_raw_data()
+
+    print(
+        f"Raw data: {df_raw.shape}"
+    )
+
+    # --------------------------------------------------------
+    # 2. Quality Gates
+    # --------------------------------------------------------
+
+    quality_passed = run_quality_gates(
+        df_raw
+    )
+
+    if not quality_passed:
+
+        raise SystemExit(
+            "Quality Gates failed."
+        )
+
+    # --------------------------------------------------------
+    # 3. Features
+    # --------------------------------------------------------
+
+    df_features = build_features(
+        df_raw
+    )
+
+    # --------------------------------------------------------
+    # 4. X / y
+    # --------------------------------------------------------
+
+    X = df_features.drop(
+        columns=[TARGET_COLUMN]
+    )
+
+    y = (
+        df_features[TARGET_COLUMN]
+        .map({
+            "no": 0,
+            "yes": 1
+        })
+        .astype(int)
+    )
+
+    feature_set = list(
+        X.columns
+    )
+
+    # --------------------------------------------------------
+    # 5. Train / Test
+    # --------------------------------------------------------
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE,
+        stratify=y
+    )
+
+    # --------------------------------------------------------
+    # 6. Baseline
+    # --------------------------------------------------------
+
+    baseline = Pipeline([
+        (
+            "preprocessor",
+            build_preprocessor(X_train)
+        ),
+
+        (
+            "model",
+            DummyClassifier(
+                strategy="most_frequent"
+            )
+        )
+    ])
+
+    baseline.fit(
+        X_train,
+        y_train
+    )
+
+    baseline_metrics = evaluate_model(
+        baseline,
+        X_test,
+        y_test
+    )
+
+    print_metrics(
+        "BASELINE",
+        baseline_metrics
+    )
+
+    # --------------------------------------------------------
+    # 7. Candidate Models
+    # --------------------------------------------------------
+
     pipelines = {
+
         "logistic_regression": Pipeline([
-            ("preprocessor", build_preprocessor(X_train)),
-            ("model", LogisticRegression(random_state=RANDOM_STATE, max_iter=2000, class_weight="balanced"))
+            (
+                "preprocessor",
+                build_preprocessor(X_train)
+            ),
+
+            (
+                "model",
+                LogisticRegression(
+                    random_state=RANDOM_STATE,
+                    max_iter=2000,
+                    class_weight="balanced"
+                )
+            )
         ]),
+
         "decision_tree": Pipeline([
-            ("preprocessor", build_preprocessor(X_train)),
-            ("model", DecisionTreeClassifier(random_state=RANDOM_STATE, class_weight="balanced"))
+            (
+                "preprocessor",
+                build_preprocessor(X_train)
+            ),
+
+            (
+                "model",
+                DecisionTreeClassifier(
+                    random_state=RANDOM_STATE,
+                    class_weight="balanced"
+                )
+            )
         ]),
+
         "random_forest": Pipeline([
-            ("preprocessor", build_preprocessor(X_train)),
-            ("model", RandomForestClassifier(random_state=RANDOM_STATE, class_weight="balanced", n_jobs=-1))
-        ]),
+            (
+                "preprocessor",
+                build_preprocessor(X_train)
+            ),
+
+            (
+                "model",
+                RandomForestClassifier(
+                    random_state=RANDOM_STATE,
+                    class_weight="balanced",
+                    n_jobs=-1
+                )
+            )
+        ])
     }
 
     param_grids = {
-        "logistic_regression": {"model__C": [0.01, 0.1, 1, 10, 100]},
-        "decision_tree": {"model__max_depth": [3, 5, 10, None], "model__min_samples_split": [2, 5, 10]},
-        "random_forest": {"model__n_estimators": [200, 300, 400], "model__max_depth": [10, 15, 20, None]},
+
+        "logistic_regression": {
+            "model__C": [
+                0.01,
+                0.1,
+                1,
+                10,
+                100
+            ]
+        },
+
+        "decision_tree": {
+            "model__max_depth": [
+                3,
+                5,
+                10,
+                None
+            ],
+
+            "model__min_samples_split": [
+                2,
+                5,
+                10
+            ]
+        },
+
+        "random_forest": {
+            "model__n_estimators": [
+                200,
+                300
+            ],
+
+            "model__max_depth": [
+                10,
+                15,
+                20,
+                None
+            ]
+        }
     }
 
-    grid_searches = {}
+    # --------------------------------------------------------
+    # 8. Training
+    # --------------------------------------------------------
+
+    results = {}
+
     for name, pipeline in pipelines.items():
-        print(f"\nAjustando hiperparámetros para {name}...")
-        grid_search = GridSearchCV(
+
+        print(
+            f"\nTraining {name}..."
+        )
+
+        grid = GridSearchCV(
             estimator=pipeline,
             param_grid=param_grids[name],
             scoring="f1",
             cv=CV_FOLDS,
             n_jobs=-1,
-            verbose=1,
-            refit=True,
+            refit=True
         )
-        grid_search.fit(X_train, y_train)
-        grid_searches[name] = grid_search
 
-    # 8. Evaluación y Selección
-    cv_results = {name: gs.best_score_ for name, gs in grid_searches.items()}
-    best_model_name = max(cv_results, key=cv_results.get)
-    best_grid_search = grid_searches[best_model_name]
-    best_model = best_grid_search.best_estimator_
+        grid.fit(
+            X_train,
+            y_train
+        )
 
-    print_metrics("BASELINE", baseline_metrics)
-    final_metrics = evaluate_model(best_model, X_test, y_test)
-    print_metrics(f"MODELO FINAL: {best_model_name}", final_metrics)
+        metrics = evaluate_model(
+            grid.best_estimator_,
+            X_test,
+            y_test
+        )
 
-    # 9. Registro en MLflow
-    log_run(
+        results[name] = {
+            "grid": grid,
+            "metrics": metrics
+        }
+
+        print_metrics(
+            name,
+            metrics
+        )
+
+    # --------------------------------------------------------
+    # 9. Select model
+    # --------------------------------------------------------
+
+    best_model_name = max(
+        results,
+        key=lambda name:
+        results[name]["metrics"]["f1"]
+    )
+
+    best_grid = results[
+        best_model_name
+    ]["grid"]
+
+    best_model = (
+        best_grid.best_estimator_
+    )
+
+    best_metrics = (
+        results[best_model_name]
+        ["metrics"]
+    )
+
+    print_metrics(
+        f"FINAL MODEL: {best_model_name}",
+        best_metrics
+    )
+
+    # --------------------------------------------------------
+    # 10. MLflow
+    # --------------------------------------------------------
+
+    log_model_run(
         run_name="baseline_dummy",
         model=baseline,
         algorithm="DummyClassifier",
-        params={"strategy": "most_frequent"},
+        params={
+            "strategy": "most_frequent"
+        },
         metrics=baseline_metrics,
-        feature_set=FEATURE_SET,
+        feature_set=feature_set
     )
 
     algorithm_mapping = {
-        "logistic_regression": "LogisticRegression",
-        "decision_tree": "DecisionTreeClassifier",
-        "random_forest": "RandomForestClassifier",
+
+        "logistic_regression":
+            "LogisticRegression",
+
+        "decision_tree":
+            "DecisionTreeClassifier",
+
+        "random_forest":
+            "RandomForestClassifier"
     }
 
-    for name, grid_search in grid_searches.items():
-        log_run(
-            run_name=f"{name}_tuned",
-            model=grid_search.best_estimator_,
+    for name, result in results.items():
+
+        log_model_run(
+            run_name=f"{name}_candidate",
+            model=result["grid"].best_estimator_,
             algorithm=algorithm_mapping[name],
-            params=grid_search.best_params_,
-            metrics={"cv_f1": grid_search.best_score_},
-            feature_set=FEATURE_SET,
+            params=result["grid"].best_params_,
+            metrics=result["metrics"],
+            cv_f1=result["grid"].best_score_,
+            feature_set=feature_set
         )
 
-    log_run(
-        run_name=f"{best_model_name}_final",
+    # --------------------------------------------------------
+    # 11. Register selected model
+    # --------------------------------------------------------
+
+    log_model_run(
+        run_name=f"{best_model_name}_production_candidate",
         model=best_model,
-        algorithm=algorithm_mapping[best_model_name],
-        params=best_grid_search.best_params_,
-        metrics=final_metrics,
-        feature_set=FEATURE_SET,
-        register_as="bank-marketing-classifier",
+        algorithm=algorithm_mapping[
+            best_model_name
+        ],
+        params=best_grid.best_params_,
+        metrics=best_metrics,
+        cv_f1=best_grid.best_score_,
+        feature_set=feature_set,
+        register_model=True
     )
 
-    # Exportar el modelo final físicamente a models/
-    joblib.dump(best_model, MODELS_DIR / "best_model.joblib")
+    # --------------------------------------------------------
+    # 12. Save model locally
+    # --------------------------------------------------------
 
-    print("\n" + "=" * 70 + "\nPIPELINE COMPLETADO CORRECTAMENTE\n" + "=" * 70)
+    model_path = (
+        MODELS_DIR /
+        "best_model.joblib"
+    )
+
+    joblib.dump(
+        best_model,
+        model_path
+    )
+
+    print(
+        f"\nModelo guardado en: {model_path}"
+    )
+
+    print(
+        "\nTRAINING COMPLETED"
+    )
+
 
 if __name__ == "__main__":
     main()
