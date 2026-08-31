@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def build_features(df):
     """
@@ -31,14 +34,14 @@ def build_features(df):
     )
 
     # Tratamiento de pdays
-    df["pdays"] = df["pdays"].replace(-1, 0)
+    # df["pdays"] = df["pdays"].replace(-1, 0)
 
     # Transformaciones logarítmicas
-    df["campaign_log"] = np.log1p(
+    df["campaign_log"] = np.log1p( #Eso puede generar variables altamente relacionadas
         df["campaign"]
     )
 
-    df["previous_log"] = np.log1p(
+    df["previous_log"] = np.log1p( #Eso puede generar variables altamente relacionadas
         df["previous"]
     )
 
@@ -47,5 +50,5 @@ def build_features(df):
         df = df.drop(
             columns=["duration"]
         )
-
+    
     return df
