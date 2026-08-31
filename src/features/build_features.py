@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def build_features(df):
     """
@@ -47,5 +50,5 @@ def build_features(df):
         df = df.drop(
             columns=["duration"]
         )
-
+    
     return df
