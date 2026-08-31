@@ -56,12 +56,13 @@ CV_FOLDS = 5
 MLFLOW_TRACKING_URI = "http://127.0.0.1:5000"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_FILE = PROJECT_ROOT / "data" / "raw" / "bank_marketing.csv"
 MODELS_DIR = PROJECT_ROOT / "models"
 MLARTIFACTS_DIR = PROJECT_ROOT / "mlartifacts"
+REPORTS_DIR = PROJECT_ROOT / "reports" / "figures"
 
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 MLARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -143,19 +144,17 @@ def log_run(
             display.plot()
             plt.title(f"Matriz de Confusión - {run_name}")
             plt.tight_layout()
-            
+
             # Guardar en local ANTES de cerrar la figura
-            figures_dir = PROJECT_ROOT / "reports" / "figures"
-            figures_dir.mkdir(parents=True, exist_ok=True)
-            plt.savefig(figures_dir / f"confusion_matrix_{run_name}.png")
+            plt.savefig(REPORTS_DIR / f"confusion_matrix_{run_name}.png")
 
             with tempfile.TemporaryDirectory() as temp_dir:
                 cm_path = Path(temp_dir) / "confusion_matrix.png"
                 plt.savefig(cm_path)
-                plt.close()
                 mlflow.log_artifact(str(cm_path), artifact_path="evaluation")
-            plt.close()       
             
+            plt.close()
+
         config = {
             "run_name": run_name,
             "algorithm": algorithm,
@@ -196,7 +195,7 @@ def main():
         raise SystemExit("Quality Gates fallidas. Pipeline bloqueado.")
     print("Quality Gates superados.")
 
-    # 3. Feature Engineering (Usa la función modular importada)
+    # 3. Feature Engineering
     df_features = build_features(df_raw)
     print(f"Feature Engineering completado. Dimensiones: {df_features.shape}")
 
@@ -207,9 +206,8 @@ def main():
     X = df_features.drop(columns=[TARGET_COLUMN])
     FEATURE_SET = list(X.columns)
 
-    # Convertir el target 'no'/'yes' a 0/1
     y = df_features[TARGET_COLUMN].map({"no": 0, "yes": 1}).astype(int)
-    
+
     # 5. Train / Test Split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
@@ -306,13 +304,10 @@ def main():
         register_as="bank-marketing-classifier",
     )
 
-    print("\n" + "=" * 70 + "\nPIPELINE COMPLETADO CORRECTAMENTE\n" + "=" * 70)
-    
     # Exportar el modelo final físicamente a models/
-    models_dir = PROJECT_ROOT / "models"
-    models_dir.mkdir(parents=True, exist_ok=True)
+    joblib.dump(best_model, MODELS_DIR / "best_model.joblib")
 
-    joblib.dump(best_model, models_dir / "best_model.joblib")
+    print("\n" + "=" * 70 + "\nPIPELINE COMPLETADO CORRECTAMENTE\n" + "=" * 70)
 
 if __name__ == "__main__":
     main()
