@@ -27,8 +27,6 @@ class BankMarketingRequest(BaseModel):
 
     month: str
 
-    duration: int
-
     campaign: int
 
     pdays: int

@@ -146,11 +146,3 @@ def analyze_missing_values(df_raw):
 
         print(target_distribution_not_missing)
 
-if __name__ == "__main__":
-
-    df_raw = load_raw_data()
-
-    run_data_quality_diagnosis(df_raw)
-    
-    analyze_missing_values(df_raw)
-    

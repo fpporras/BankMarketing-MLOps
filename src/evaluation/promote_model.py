@@ -1,86 +1,264 @@
 import mlflow
+
 from mlflow.tracking import MlflowClient
 
-# ============================================================
-# CONFIGURACIÓN DE UMBRALES Y REGISTRY
-# ============================================================
-
-# Umbrales para desarrollo
-MIN_F1 = 0.40      
-MIN_RECALL = 0.55   
-MIN_ROC_AUC = 0.70 
-
-MLFLOW_TRACKING_URI = "http://127.0.0.1:5000"
-REGISTERED_MODEL_NAME = "bank-marketing-classifier"
 
 # ============================================================
-# VALIDACIÓN DE MÉTRICAS
+# CONFIGURATION
 # ============================================================
-def validate_model(metrics: dict) -> bool:
-    """Verifica si el modelo cumple con los umbrales mínimos de negocio."""
+
+MIN_F1 = 0.40
+
+MIN_RECALL = 0.55
+
+MIN_ROC_AUC = 0.70
+
+
+MLFLOW_TRACKING_URI = (
+    "http://127.0.0.1:5000"
+)
+
+REGISTERED_MODEL_NAME = (
+    "bank-marketing-classifier"
+)
+
+
+# ============================================================
+# MODEL VALIDATION
+# ============================================================
+
+def validate_model(
+    metrics: dict
+) -> bool:
+    """
+    Verifica si el modelo cumple con
+    los umbrales mínimos establecidos.
+    """
+
     checks = {
-        "f1": metrics.get("f1", 0) >= MIN_F1,
-        "recall": metrics.get("recall", 0) >= MIN_RECALL,
-        "roc_auc": metrics.get("roc_auc", 0) >= MIN_ROC_AUC,
+
+        "f1":
+            metrics.get(
+                "f1",
+                0
+            ) >= MIN_F1,
+
+        "recall":
+            metrics.get(
+                "recall",
+                0
+            ) >= MIN_RECALL,
+
+        "roc_auc":
+            metrics.get(
+                "roc_auc",
+                0
+            ) >= MIN_ROC_AUC,
     }
 
-    print("\n" + "=" * 45)
-    print("MODEL VALIDATION FOR PROMOTION")
-    print("=" * 45)
-
-    for metric, passed in checks.items():
-        val = metrics.get(metric, 0.0)
-        status = "PASS" if passed else "FAIL"
-        print(f"{metric.upper():<8}: {val:.4f} -> {status}")
-
-    return all(checks.values())
-
-# ============================================================
-# PROMOCIÓN EN MLFLOW MODEL REGISTRY
-# ============================================================
-def promote_registered_model(model_name: str, metrics: dict):
-    """
-    Si valida las métricas, le asigna el alias 'champion' en MLflow.
-    """
-    if not validate_model(metrics):
-        print("\nEl modelo NO cumplió los umbrales requeridos. No será promocionado.")
-        return False
-
-    client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
-    
-    # Obtener la última versión del modelo registrado
-    latest_versions = client.get_latest_versions(name=model_name)
-    if not latest_versions:
-        print(f"No se encontraron versiones registradas para '{model_name}'.")
-        return False
-        
-    latest_version = latest_versions[-1].version
-
-    # Asignar alias 'champion' a la versión aprobada (MLflow v2+)
-    client.set_registered_model_alias(
-        name=model_name,
-        alias="champion",
-        version=latest_version
+    print(
+        "\n" +
+        "=" * 50
     )
 
-    print("\n" + "=" * 45)
-    print(f"ÉXITO: Modelo '{model_name}' versión {latest_version} promocionado a 'champion'.")
-    print("=" * 45)
-    return True
+    print(
+        "MODEL VALIDATION"
+    )
+
+    print(
+        "=" * 50
+    )
+
+    for metric, passed in checks.items():
+
+        value = metrics.get(
+            metric,
+            0.0
+        )
+
+        status = (
+            "PASS"
+            if passed
+            else "FAIL"
+        )
+
+        print(
+            f"{metric.upper():<8}: "
+            f"{value:.4f} -> {status}"
+        )
+
+    return all(
+        checks.values()
+    )
+
 
 # ============================================================
-# EJECUCIÓN AUTÓNOMA O IMPORTADA
+# GET LATEST REGISTERED VERSION
 # ============================================================
-if __name__ == "__main__":
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    client = MlflowClient()
-    
-    # Ejemplo: Obtener métricas de la última ejecución en MLflow
-    try:
-        latest_version = client.get_latest_versions(REGISTERED_MODEL_NAME)[-1]
-        run_id = latest_version.run_id
-        run_data = client.get_run(run_id).data.metrics
-        
-        promote_registered_model(REGISTERED_MODEL_NAME, run_data)
-    except Exception as e:
-        print(f" Error al ejecutar la promoción: {e}")
+
+def get_latest_registered_version(
+    model_name: str
+):
+    """
+    Obtiene la versión más reciente
+    del modelo registrado.
+    """
+
+    client = MlflowClient(
+        tracking_uri=
+            MLFLOW_TRACKING_URI
+    )
+
+    versions = (
+        client
+        .search_model_versions(
+            filter_string=
+                f"name='{model_name}'"
+        )
+    )
+
+    if not versions:
+
+        return None
+
+    versions = sorted(
+
+        versions,
+
+        key=lambda version:
+            int(version.version)
+    )
+
+    return versions[-1]
+
+
+# ============================================================
+# PROMOTION
+# ============================================================
+
+def promote_registered_model(
+    model_name: str,
+    metrics: dict
+):
+    """
+    Valida las métricas y, si cumplen
+    los umbrales, asigna el alias
+    'champion' a la última versión registrada.
+    """
+
+    # ========================================================
+    # 1. VALIDATE
+    # ========================================================
+
+    if not validate_model(
+        metrics
+    ):
+
+        print(
+            "\nEl modelo NO cumplió "
+            "los umbrales requeridos."
+        )
+
+        print(
+            "No será promocionado."
+        )
+
+        return False
+
+    # ========================================================
+    # 2. MLflow Client
+    # ========================================================
+
+    client = MlflowClient(
+        tracking_uri=
+            MLFLOW_TRACKING_URI
+    )
+
+    # ========================================================
+    # 3. Latest Version
+    # ========================================================
+
+    latest_version = (
+        get_latest_registered_version(
+            model_name
+        )
+    )
+
+    if latest_version is None:
+
+        print(
+            f"\nNo se encontraron "
+            f"versiones registradas para "
+            f"'{model_name}'."
+        )
+
+        return False
+
+    version_number = (
+        latest_version.version
+    )
+
+    print(
+        "\nVersión registrada encontrada:"
+    )
+
+    print(
+        f"Modelo: {model_name}"
+    )
+
+    print(
+        f"Versión: {version_number}"
+    )
+
+    print(
+        f"Run ID: "
+        f"{latest_version.run_id}"
+    )
+
+    # ========================================================
+    # 4. Assign Champion Alias
+    # ========================================================
+
+    client.set_registered_model_alias(
+
+        name=model_name,
+
+        alias="champion",
+
+        version=version_number
+    )
+
+    # ========================================================
+    # 5. Success
+    # ========================================================
+
+    print(
+        "\n" +
+        "=" * 50
+    )
+
+    print(
+        "MODEL PROMOTION"
+    )
+
+    print(
+        "=" * 50
+    )
+
+    print(
+        f"✓ Modelo: {model_name}"
+    )
+
+    print(
+        f"✓ Versión: {version_number}"
+    )
+
+    print(
+        "✓ Alias: champion"
+    )
+
+    print(
+        "=" * 50
+    )
+
+    return True

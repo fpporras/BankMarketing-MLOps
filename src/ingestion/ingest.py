@@ -60,7 +60,3 @@ def load_raw_data():
     df_raw = pd.read_csv(input_file)
 
     return df_raw
-
-
-if __name__ == "__main__":
-    ingest_bank_marketing()
