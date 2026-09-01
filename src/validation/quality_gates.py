@@ -551,22 +551,3 @@ def run_quality_gates(df_raw):
     )
 
     return True
-
-
-# ============================================================
-# MAIN
-# ============================================================
-
-if __name__ == "__main__":
-
-    df_raw = load_raw_data()
-
-    quality_passed = run_quality_gates(
-        df_raw
-    )
-    if not quality_passed:
-
-        raise SystemExit(
-            "Las puertas de calidad fallaron. "
-            "El pipeline ha sido bloqueado."
-        )
