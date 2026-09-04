@@ -9,7 +9,7 @@ PROJECT_ROOT = (
 
 PRODUCTION_DIR = (
     PROJECT_ROOT
-    / "monitoring"
+    / "data"
     / "production"
 )
 
@@ -21,13 +21,22 @@ def simulate_drift():
         / "batch_3.csv"
     )
 
+    if not batch_path.exists():
+
+        raise FileNotFoundError(
+            f"No existe: {batch_path}\n"
+            "Primero crea los production batches."
+        )
+
     df = pd.read_csv(
         batch_path
     )
 
-    # --------------------------------------------------------
-    # Simulación de cambio de distribución
-    # --------------------------------------------------------
+    print("\nSimulando data drift...")
+
+    # ========================================================
+    # AGE DRIFT
+    # ========================================================
 
     df["age"] = (
         df["age"] + 15
@@ -35,13 +44,25 @@ def simulate_drift():
         upper=100
     )
 
+    # ========================================================
+    # BALANCE DRIFT
+    # ========================================================
+
     df["balance"] = (
         df["balance"] * 2
     )
 
+    # ========================================================
+    # CAMPAIGN DRIFT
+    # ========================================================
+
     df["campaign"] = (
         df["campaign"] + 3
     )
+
+    # ========================================================
+    # SAVE
+    # ========================================================
 
     df.to_csv(
         batch_path,
@@ -49,7 +70,8 @@ def simulate_drift():
     )
 
     print(
-        "Drift simulado en batch_3."
+        f"Drift simulado en:"
+        f"\n{batch_path}"
     )
 
 

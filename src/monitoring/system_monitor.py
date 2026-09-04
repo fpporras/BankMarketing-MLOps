@@ -1,12 +1,11 @@
 import time
 
+import pandas as pd
 import psutil
 
 
 REQUEST_COUNT = 0
-
 ERROR_COUNT = 0
-
 LATENCIES = []
 
 
@@ -14,6 +13,9 @@ def record_request(
     latency_ms: float,
     error: bool = False
 ):
+    """
+    Registra una petición de la API.
+    """
 
     global REQUEST_COUNT
     global ERROR_COUNT
@@ -29,16 +31,16 @@ def record_request(
 
 
 def get_system_metrics():
+    """
+    Obtiene métricas actuales del sistema.
+    """
 
-    cpu_percent = (
-        psutil.cpu_percent(
-            interval=0.1
-        )
+    cpu_percent = psutil.cpu_percent(
+        interval=0.1
     )
 
     memory_percent = (
-        psutil.virtual_memory()
-        .percent
+        psutil.virtual_memory().percent
     )
 
     if LATENCIES:
@@ -82,3 +84,16 @@ def get_system_metrics():
         "memory_percent":
             memory_percent
     }
+
+
+def monitor_system():
+    """
+    Ejecuta el monitoreo del sistema y devuelve
+    un DataFrame para facilitar su visualización.
+    """
+
+    metrics = get_system_metrics()
+
+    return pd.DataFrame(
+        [metrics]
+    )

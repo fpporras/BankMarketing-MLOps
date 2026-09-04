@@ -37,7 +37,13 @@ def create_batch(
     df = build_features(
         df
     )
+    if sample_size > len(df):
 
+        raise ValueError(
+            f"sample_size={sample_size} "
+            f"es mayor que el dataset "
+            f"({len(df)} filas)."
+        )
     batch = df.sample(
         n=sample_size,
         random_state=
@@ -57,7 +63,7 @@ def create_batch(
     print(
         f"Batch creado: {output}"
     )
-
+    return output
 
 if __name__ == "__main__":
 
