@@ -190,4 +190,3 @@ def monitor_numeric_features(reference_df, current_df, columns):
         )
 
     return pd.DataFrame(results)
-
