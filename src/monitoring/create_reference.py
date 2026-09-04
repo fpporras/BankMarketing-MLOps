@@ -52,8 +52,12 @@ def create_reference():
         f"Reference dataset creado: "
         f"{REFERENCE_FILE}"
     )
+    print(
+        f"Shape: {reference.shape}"
+    )
+    return reference
 
-
+    
 if __name__ == "__main__":
 
     create_reference()

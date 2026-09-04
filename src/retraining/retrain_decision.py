@@ -7,6 +7,23 @@ def should_retrain(
     max_psi,
     current_f1
 ):
+    """
+    Determina si debe ejecutarse retraining.
+
+    Reglas:
+
+    1. Drift + degradación:
+       retrain = True
+
+    2. Solo drift:
+       retrain = False
+
+    3. Solo degradación:
+       retrain = True
+
+    4. Ninguna:
+       retrain = False
+    """
 
     drift_detected = (
         max_psi
@@ -17,6 +34,10 @@ def should_retrain(
         current_f1
         < F1_MINIMUM_THRESHOLD
     )
+
+    # --------------------------------------------------------
+    # Drift + performance degradation
+    # --------------------------------------------------------
 
     if (
         drift_detected
@@ -32,6 +53,10 @@ def should_retrain(
                 "y degradación del modelo."
         }
 
+    # --------------------------------------------------------
+    # Only drift
+    # --------------------------------------------------------
+
     if drift_detected:
 
         return {
@@ -44,6 +69,10 @@ def should_retrain(
                 "suficiente del modelo."
         }
 
+    # --------------------------------------------------------
+    # Only performance degradation
+    # --------------------------------------------------------
+
     if performance_degraded:
 
         return {
@@ -54,6 +83,10 @@ def should_retrain(
                 "El rendimiento del modelo "
                 "está por debajo del umbral."
         }
+
+    # --------------------------------------------------------
+    # No problem
+    # --------------------------------------------------------
 
     return {
 

@@ -25,6 +25,17 @@ MODEL_PATH = (
 def evaluate_production_batch(
     batch_file
 ):
+    """
+    Evalúa el modelo actual contra un batch
+    de producción que contiene el target real.
+    """
+
+    if not MODEL_PATH.exists():
+
+        raise FileNotFoundError(
+            f"No se encontró el modelo en: "
+            f"{MODEL_PATH}"
+        )
 
     model = joblib.load(
         MODEL_PATH
@@ -33,6 +44,13 @@ def evaluate_production_batch(
     df = pd.read_csv(
         batch_file
     )
+
+    if "y" not in df.columns:
+
+        raise ValueError(
+            "El batch de producción debe "
+            "contener la columna 'y'."
+        )
 
     X = df.drop(
         columns=["y"]
@@ -45,6 +63,13 @@ def evaluate_production_batch(
             "yes": 1
         })
     )
+
+    if y.isna().any():
+
+        raise ValueError(
+            "La columna 'y' contiene "
+            "valores no válidos."
+        )
 
     predictions = model.predict(
         X
@@ -59,31 +84,56 @@ def evaluate_production_batch(
     metrics = {
 
         "precision":
-            precision_score(
-                y,
-                predictions,
-                zero_division=0
+            float(
+                precision_score(
+                    y,
+                    predictions,
+                    zero_division=0
+                )
             ),
 
         "recall":
-            recall_score(
-                y,
-                predictions,
-                zero_division=0
+            float(
+                recall_score(
+                    y,
+                    predictions,
+                    zero_division=0
+                )
             ),
 
         "f1":
-            f1_score(
-                y,
-                predictions,
-                zero_division=0
+            float(
+                f1_score(
+                    y,
+                    predictions,
+                    zero_division=0
+                )
             ),
 
         "roc_auc":
-            roc_auc_score(
-                y,
-                probabilities
+            float(
+                roc_auc_score(
+                    y,
+                    probabilities
+                )
             )
     }
 
     return metrics
+
+
+def monitor_model(
+    batch_file
+):
+    """
+    Ejecuta model monitoring sobre un batch
+    y devuelve un DataFrame.
+    """
+
+    metrics = evaluate_production_batch(
+        batch_file
+    )
+
+    return pd.DataFrame(
+        [metrics]
+    )
