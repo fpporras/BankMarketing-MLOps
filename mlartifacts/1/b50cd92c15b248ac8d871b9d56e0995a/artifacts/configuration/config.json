@@ -1,0 +1,42 @@
+{
+    "run_name": "random_forest_candidate",
+    "algorithm": "RandomForestClassifier",
+    "random_state": 42,
+    "data_version": "bank-marketing-v1",
+    "feature_set": [
+        "age",
+        "job",
+        "marital",
+        "education",
+        "default",
+        "balance",
+        "housing",
+        "loan",
+        "contact",
+        "day_of_week",
+        "month",
+        "campaign",
+        "pdays",
+        "previous",
+        "poutcome",
+        "had_previous_contact",
+        "campaign_log",
+        "previous_log"
+    ],
+    "feature_count": 18,
+    "parameters": {
+        "model__max_depth": 15,
+        "model__n_estimators": 200
+    },
+    "metrics": {
+        "accuracy": 0.8437465442883999,
+        "precision": 0.3862908392056374,
+        "recall": 0.5699432892249527,
+        "f1": 0.46048109965635736,
+        "roc_auc": 0.7985659548326081,
+        "true_negatives": 7027,
+        "false_positives": 958,
+        "false_negatives": 455,
+        "true_positives": 603
+    }
+}

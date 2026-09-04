@@ -1,0 +1,577 @@
+from pathlib import Path
+import sys
+import traceback
+
+import mlflow
+
+from src.ingestion.ingest import (
+    ingest_bank_marketing
+)
+
+from src.validation.data_quality import (
+    run_data_quality_diagnosis,
+    analyze_missing_values
+)
+
+from src.validation.quality_gates import (
+    run_quality_gates
+)
+
+from src.features.prepare_data import (
+    prepare_processed_data
+)
+
+from src.training.train import (
+    train_models
+)
+
+from src.evaluation.promote_model import (
+    promote_registered_model
+)
+
+from src.monitoring.monitoring_runner import (
+    run_monitoring
+)
+
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+MLFLOW_TRACKING_URI = (
+    "http://127.0.0.1:5000"
+)
+
+REGISTERED_MODEL_NAME = (
+    "bank-marketing-classifier"
+)
+
+
+PROJECT_ROOT = (
+    Path(__file__).resolve().parents[1]
+)
+
+MODELS_DIR = (
+    PROJECT_ROOT
+    / "models"
+)
+
+MODELS_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
+
+# ============================================================
+# LOGGING
+# ============================================================
+
+def print_stage(
+    number,
+    title
+):
+
+    print("\n")
+
+    print("=" * 80)
+
+    print(
+        f"ETAPA {number} — {title}"
+    )
+
+    print("=" * 80)
+
+
+# ============================================================
+# TRAINING PIPELINE
+# ============================================================
+
+def execute_training_pipeline(
+    pipeline_type="INITIAL TRAINING"
+):
+    """
+    Ejecuta el pipeline completo de entrenamiento.
+
+    Puede utilizarse tanto para:
+
+    - entrenamiento inicial
+    - retraining
+    """
+
+    print("\n")
+
+    print("=" * 80)
+
+    print(
+        f"BANK MARKETING ML PIPELINE"
+    )
+
+    print(
+        f"MODE: {pipeline_type}"
+    )
+
+    print("=" * 80)
+
+    # ========================================================
+    # 1. INGESTION
+    # ========================================================
+
+    print_stage(
+        1,
+        "INGESTA"
+    )
+
+    df_raw = ingest_bank_marketing()
+
+    print(
+        "\n✓ Ingesta completada."
+    )
+
+    # ========================================================
+    # 2. DATA QUALITY
+    # ========================================================
+
+    print_stage(
+        2,
+        "DIAGNÓSTICO DE CALIDAD"
+    )
+
+    run_data_quality_diagnosis(
+        df_raw
+    )
+
+    analyze_missing_values(
+        df_raw
+    )
+
+    print(
+        "\n✓ Diagnóstico completado."
+    )
+
+    # ========================================================
+    # 3. QUALITY GATES
+    # ========================================================
+
+    print_stage(
+        3,
+        "QUALITY GATES"
+    )
+
+    quality_passed = (
+        run_quality_gates(
+            df_raw
+        )
+    )
+
+    if not quality_passed:
+
+        print(
+            "\n✗ QUALITY GATES FALLARON."
+        )
+
+        print(
+            "Pipeline bloqueado."
+        )
+
+        return False
+
+    print(
+        "\n✓ QUALITY GATES APROBADOS."
+    )
+
+    # ========================================================
+    # 4. FEATURE ENGINEERING
+    # ========================================================
+
+    print_stage(
+        4,
+        "FEATURE ENGINEERING"
+    )
+
+    df_features = (
+        prepare_processed_data(
+            df_raw
+        )
+    )
+
+    print(
+        "\n✓ Feature engineering completado."
+    )
+
+    # ========================================================
+    # 5. TRAINING
+    # ========================================================
+
+    print_stage(
+        5,
+        "TRAINING"
+    )
+
+    training_results = train_models(
+        df_features
+    )
+
+    print(
+        "\n✓ Entrenamiento completado."
+    )
+
+    # ========================================================
+    # 6. BEST MODEL
+    # ========================================================
+
+    best_model_name = (
+        training_results[
+            "best_model_name"
+        ]
+    )
+
+    best_model = (
+        training_results[
+            "best_model"
+        ]
+    )
+
+    best_metrics = (
+        training_results[
+            "best_metrics"
+        ]
+    )
+
+    print(
+        "\n" +
+        "=" * 80
+    )
+
+    print(
+        "MEJOR MODELO"
+    )
+
+    print(
+        "=" * 80
+    )
+
+    print(
+        f"Modelo: "
+        f"{best_model_name}"
+    )
+
+    print(
+        f"F1: "
+        f"{best_metrics['f1']:.4f}"
+    )
+
+    print(
+        f"Recall: "
+        f"{best_metrics['recall']:.4f}"
+    )
+
+    print(
+        f"ROC-AUC: "
+        f"{best_metrics['roc_auc']:.4f}"
+    )
+
+    # ========================================================
+    # 7. MLFLOW
+    # ========================================================
+
+    print_stage(
+        6,
+        "MLFLOW"
+    )
+
+    mlflow.set_tracking_uri(
+        MLFLOW_TRACKING_URI
+    )
+
+    print(
+        "✓ MLflow configurado."
+    )
+
+    # ========================================================
+    # 8. MODEL REGISTRATION
+    # ========================================================
+
+    print_stage(
+        7,
+        "MODEL REGISTRATION"
+    )
+
+    registered = (
+        training_results[
+            "registered"
+        ]
+    )
+
+    if not registered:
+
+        print(
+            "⚠ El modelo no fue registrado."
+        )
+
+        return False
+
+    print(
+        "\n✓ Modelo registrado en MLflow."
+    )
+
+    # ========================================================
+    # 9. MODEL VALIDATION / PROMOTION
+    # ========================================================
+
+    print_stage(
+        8,
+        "MODEL VALIDATION & PROMOTION"
+    )
+
+    promoted = (
+        promote_registered_model(
+
+            model_name=
+                REGISTERED_MODEL_NAME,
+
+            metrics=
+                best_metrics
+        )
+    )
+
+    if promoted:
+
+        print(
+            "\n✓ Modelo promocionado "
+            "a champion."
+        )
+
+    else:
+
+        print(
+            "\n⚠ Modelo NO promocionado."
+        )
+
+    # ========================================================
+    # 10. SAVE LOCAL MODEL
+    # ========================================================
+
+    print_stage(
+        9,
+        "MODEL ARTIFACT"
+    )
+
+    model_path = (
+        MODELS_DIR
+        / "best_model.joblib"
+    )
+
+    training_results[
+        "save_model"
+    ](
+        best_model,
+        model_path
+    )
+
+    # ========================================================
+    # FINAL
+    # ========================================================
+
+    print("\n")
+
+    print("=" * 80)
+
+    print(
+        f"{pipeline_type} "
+        "COMPLETED SUCCESSFULLY"
+    )
+
+    print("=" * 80)
+
+    return True
+
+
+# ============================================================
+# MONITORING + CONDITIONAL RETRAINING
+# ============================================================
+
+def execute_monitoring_pipeline():
+
+    print("\n")
+
+    print("=" * 80)
+
+    print(
+        "BANK MARKETING MONITORING PIPELINE"
+    )
+
+    print("=" * 80)
+
+    # ========================================================
+    # 1. MONITORING
+    # ========================================================
+
+    print_stage(
+        1,
+        "MONITORING"
+    )
+
+    monitoring_results = (
+        run_monitoring()
+    )
+
+    # ========================================================
+    # 2. RETRAINING DECISION
+    # ========================================================
+
+    print_stage(
+        2,
+        "RETRAINING DECISION"
+    )
+
+    retrain = (
+        monitoring_results[
+            "retrain"
+        ]
+    )
+
+    reason = (
+        monitoring_results[
+            "reason"
+        ]
+    )
+
+    print(
+        f"Retrain: {retrain}"
+    )
+
+    print(
+        f"Reason: {reason}"
+    )
+
+    # ========================================================
+    # 3. RETRAIN
+    # ========================================================
+
+    if retrain:
+
+        print("\n")
+
+        print("=" * 80)
+
+        print(
+            "⚠ RETRAINING ACTIVATED"
+        )
+
+        print("=" * 80)
+
+        print(
+            "Se detectaron condiciones "
+            "para reentrenamiento."
+        )
+
+        training_success = (
+            execute_training_pipeline(
+                pipeline_type=
+                    "AUTOMATIC RETRAINING"
+            )
+        )
+
+        if not training_success:
+
+            print(
+                "\n✗ Retraining falló."
+            )
+
+            return False
+
+        print(
+            "\n✓ Retraining completado."
+        )
+
+    else:
+
+        print("\n")
+
+        print(
+            "✓ No se requiere retraining."
+        )
+
+    # ========================================================
+    # FIN
+    # ========================================================
+
+    print("\n")
+
+    print("=" * 80)
+
+    print(
+        "MONITORING PIPELINE COMPLETED"
+    )
+
+    print("=" * 80)
+
+    return True
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+
+    try:
+
+        # ----------------------------------------------------
+        # --monitor
+        # ----------------------------------------------------
+
+        if (
+            len(sys.argv) > 1
+            and sys.argv[1] == "--monitor"
+        ):
+
+            success = (
+                execute_monitoring_pipeline()
+            )
+
+        # ----------------------------------------------------
+        # Initial training
+        # ----------------------------------------------------
+
+        else:
+
+            success = (
+                execute_training_pipeline(
+                    pipeline_type=
+                        "INITIAL TRAINING"
+                )
+            )
+
+        return 0 if success else 1
+
+    except Exception as error:
+
+        print("\n")
+
+        print("=" * 80)
+
+        print(
+            "PIPELINE FAILED"
+        )
+
+        print("=" * 80)
+
+        print(
+            f"\nError: {error}"
+        )
+
+        traceback.print_exc()
+
+        return 1
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
+if __name__ == "__main__":
+
+    sys.exit(
+        main()
+    )
