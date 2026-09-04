@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 .venv/
 .venv-1/
 __pycache__/
@@ -10,3 +11,14 @@ notebooks/
 .pytest_cache/
 *.log
 .env
+=======
+.venv
+.venv-1
+__pycache__
+*.pyc
+.git
+.ipynb_checkpoints
+mlruns
+mlartifacts
+notebooks
+>>>>>>> Stashed changes
